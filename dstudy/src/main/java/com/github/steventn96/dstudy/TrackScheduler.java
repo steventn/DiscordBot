@@ -6,6 +6,7 @@ import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 
+//class processes AudioTrack instance and loads it into AudioPlayer
 public final class TrackScheduler implements AudioLoadResultHandler {
 
     private final AudioPlayer player;

@@ -20,20 +20,27 @@ import discord4j.voice.AudioProvider;
 
 public class DStudy {
 	
+	//imperative approach to execute commands when messages are created 
 	interface Command {
 	    void execute(MessageCreateEvent event);
 	}
 	
+	//data structure to hold all of our commands in one place
 	private static final Map<String, Command> commands = new HashMap<>();
 	
 	public static void main(String[] args) {
 		
+		// Utilizing LavaPlayer, creates AudioPlayer instances and translates URLs to AudioTrack instances
 		final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
 		playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
+		//lets playerManager parse remote sources like youtube and other audio source links
 		AudioSourceManagers.registerRemoteSources(playerManager);
+		//creates AudioPlyaer so Discord4J can receive the audio data
 		final AudioPlayer player = playerManager.createPlayer();
+		//creates LavaPlayerAudioProvider in next step
 		AudioProvider provider = new LavaPlayerAudioProvider(player);
 		
+		//bot is able to join voice channel to play music
 		commands.put("join", event -> {
 		    final discord4j.core.object.entity.Member member = event.getMember().orElse(null);
 		    if (member != null) {
@@ -44,11 +51,12 @@ public class DStudy {
 		                // join returns a VoiceConnection which would be required if we were
 		                // adding disconnection features, but for now we are just ignoring it.
 		                channel.join(spec -> spec.setProvider(provider)).block();
-		            }
+		            } 
 		        }
 		    }
 		});
 		
+		//play command and extracts arguments from it
 		final TrackScheduler scheduler = new TrackScheduler(player);
 		commands.put("play", event -> {
 		    final String content = event.getMessage().getContent();
@@ -61,6 +69,11 @@ public class DStudy {
 			    .login()
 			    .block();
 		
+		
+		//hooks up command system to Discord4J's event system
+		//EventDispatcher has single method "on" that determines type of event dispatcher provides
+		//after event happens, iterates through all commands and checks content of message starts
+		///with a prefix + command checking against, and if so, execute the command
 		client.getEventDispatcher().on(MessageCreateEvent.class)
 	    .subscribe(event -> {
 	        final String content = event.getMessage().getContent(); // 3.1 Message.getContent() is a String
@@ -76,6 +89,7 @@ public class DStudy {
 
 	}
 	
+	//ping pong command, maps "ping" and bot creates "pong" event
 	static {
 	    commands.put("ping", event -> event.getMessage()
 	        .getChannel().block()
