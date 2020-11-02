@@ -27,15 +27,50 @@ public class DStudy {
 	
 	//data structure to hold all of our commands in one place
 	private static final Map<String, Command> commands = new HashMap<>();
-	
+
+	private static GatewayDiscordClient initClient(String token) {
+		final GatewayDiscordClient client = DiscordClientBuilder.create(token).build()
+				.login()
+				.block();
+
+		//hooks up command system to Discord4J's event system
+		//EventDispatcher has single method "on" that determines type of event dispatcher provides
+		//after event happens, iterates through all commands and checks content of message starts
+		///with a prefix + command checking against, and if so, execute the command
+		client.getEventDispatcher().on(MessageCreateEvent.class)
+				.subscribe(event -> {
+					final String content = event.getMessage().getContent(); // 3.1 Message.getContent() is a String
+					for (final Map.Entry<String, Command> entry : commands.entrySet()) {
+						if (content.startsWith('!' + entry.getKey())) {
+							entry.getValue().execute(event);
+							break;
+						}
+					}
+				});
+
+		return client;
+	}
+
+	private static void initSimpleCommands() {
+		// simple commands here
+		commands.put("ping", event -> event.getMessage()
+				.getChannel().block()
+				.createMessage("Pong!").block());
+		commands.put("swag", event -> event.getMessage()
+				.getChannel().block()
+				.createMessage("Yeet!").block());
+	}
+
 	public static void main(String[] args) {
-		
+		initSimpleCommands();
+
+		/* begin complex audio commands -- we'll want to encapsulate these later probably */
 		// Utilizing LavaPlayer, creates AudioPlayer instances and translates URLs to AudioTrack instances
 		final AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
 		playerManager.getConfiguration().setFrameBufferFactory(NonAllocatingAudioFrameBuffer::new);
 		//lets playerManager parse remote sources like youtube and other audio source links
 		AudioSourceManagers.registerRemoteSources(playerManager);
-		//creates AudioPlyaer so Discord4J can receive the audio data
+		//creates AudioPlayer so Discord4J can receive the audio data
 		final AudioPlayer player = playerManager.createPlayer();
 		//creates LavaPlayerAudioProvider in next step
 		AudioProvider provider = new LavaPlayerAudioProvider(player);
@@ -51,7 +86,7 @@ public class DStudy {
 		                // join returns a VoiceConnection which would be required if we were
 		                // adding disconnection features, but for now we are just ignoring it.
 		                channel.join(spec -> spec.setProvider(provider)).block();
-		            } 
+		            }
 		        }
 		    }
 		});
@@ -63,43 +98,11 @@ public class DStudy {
 		    final List<String> command = Arrays.asList(content.split(" "));
 		    playerManager.loadItem(command.get(1), scheduler);
 		});
-		
-		//args[0] has Discord key
-		final GatewayDiscordClient client = DiscordClientBuilder.create(args[0]).build()
-			    .login()
-			    .block();
-		
-		
-		//hooks up command system to Discord4J's event system
-		//EventDispatcher has single method "on" that determines type of event dispatcher provides
-		//after event happens, iterates through all commands and checks content of message starts
-		///with a prefix + command checking against, and if so, execute the command
-		client.getEventDispatcher().on(MessageCreateEvent.class)
-	    .subscribe(event -> {
-	        final String content = event.getMessage().getContent(); // 3.1 Message.getContent() is a String
-	        for (final Map.Entry<String, Command> entry : commands.entrySet()) {
-	            if (content.startsWith('!' + entry.getKey())) {
-	                entry.getValue().execute(event);
-	                break;
-	            }
-	        }
-	    });
+
+		/* create and connect the client -- args[0] has Discord key */
+		final GatewayDiscordClient client = initClient(args[0]);
 		
 		client.onDisconnect().block();
-
-	}
-	
-	//ping pong command, maps "ping" and bot creates "pong" event
-	static {
-	    commands.put("ping", event -> event.getMessage()
-	        .getChannel().block()
-	        .createMessage("Pong!").block());
-	}
-	
-	static {
-	    commands.put("swag", event -> event.getMessage()
-	        .getChannel().block()
-	        .createMessage("Yeet!").block());
 	}
 
 }
