@@ -160,23 +160,19 @@ public class DStudy {
 		Timer timer = new Timer();
 		commands.put("timer", event -> timerFunc(timer, event, null));
 		// pause or resume music after timer; just experimental
-		commands.put("p_in", event ->
+		commands.put("toggletimer", event -> {
+			if (player.getPlayingTrack() == null) {
+				event.getMessage().getChannel().block()
+						.createMessage("no music paused, play with [!play]").block();
+				return;
+			}
 			timerFunc(timer, event, new TimerTask() {
 				@Override
 				public void run() {
-					player.setPaused(true);
+					player.setPaused(!player.isPaused());
 				}
-			})
-		);
-		commands.put("c_in", event ->
-			timerFunc(timer, event, new TimerTask() {
-				@Override
-				public void run() {
-					player.setPaused(false);
-				}
-			})
-		);
-		// hi
+			});
+		});
 
 		/* create and connect the client -- args[0] has Discord key */
 		final GatewayDiscordClient client = initClient(args[0]);
