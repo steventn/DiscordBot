@@ -44,17 +44,15 @@ public class DStudy {
 					.createMessage("something went wrong [!timer #SECS]").block();
 			return;
 		}
-		// this default_task is invariant so probably can be abstracted out wayyy later
-		TimerTask default_task = new TimerTask() {
-			@Override
-			public void run() {
-				event.getMessage().getChannel().block()
-						.createMessage(timerSeconds + "s timer done!").block();
-			}
-		};
 
 		if (task == null)
-			task = default_task;
+			task = new TimerTask() {
+				@Override
+				public void run() {
+					event.getMessage().getChannel().block()
+							.createMessage(timerSeconds + "s timer done!").block();
+				}
+			};
 
 		// execute task when timerSeconds * 1000 runs out
 		timer.schedule(task, timerSeconds * 1000);
