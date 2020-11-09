@@ -1,9 +1,6 @@
 package com.github.steventn96.dstudy;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
@@ -16,6 +13,7 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
 import discord4j.core.object.entity.channel.VoiceChannel;
+import discord4j.discordjson.json.gateway.MessageCreate;
 import discord4j.voice.AudioProvider;
 
 public class DStudy {
@@ -49,6 +47,40 @@ public class DStudy {
 				});
 
 		return client;
+	}
+		
+		private static void timerFunc(Timer timer, MessageCreateEvent event) {
+			//parse input
+			final String content = event.getMessage().getContent();
+			final List<String> command = Arrays.asList(content.split(" "));
+			int timerSeconds;
+			try {
+				timerSeconds = Integer.parseInt(command.get(1));
+			}
+			catch (NumberFormatException e) {
+				event.getMessage().getChannel().block()
+						.createMessage("argument [" + command.get(1) + "] not an integer").block();
+				return;
+			}
+			catch (Exception e) {
+				event.getMessage().getChannel().block()
+						.createMessage("something went wrong [!timer #SECS]").block();
+				return;
+			}
+			// this simpleTask is invariant so probably can be abstracted out wayyy later
+			TimerTask simpleTask = new TimerTask() {
+				@Override
+				public void run() {
+					event.getMessage().getChannel().block()
+							.createMessage(timerSeconds + "s timer done!").block();
+							
+				}
+			};
+
+		// execute simpleTask when timerSeconds * 1000 runs out
+		timer.schedule(simpleTask, timerSeconds * 1000);
+		event.getMessage().getChannel().block()
+				.createMessage(timerSeconds + "s timer started").block();
 	}
 
 	private static void initSimpleCommands() {
@@ -97,6 +129,45 @@ public class DStudy {
 		    final String content = event.getMessage().getContent();
 		    final List<String> command = Arrays.asList(content.split(" "));
 		    playerManager.loadItem(command.get(1), scheduler);
+/*		    boolean b1 = playerManager.createPlayer().isPaused();
+		    String s1 = Boolean.toString(b1);
+		    event.getMessage()
+		    .getChannel().block()
+		    .createMessage(s1).block();
+*/
+		});
+		
+		commands.put("pause", event -> {
+		    player.setPaused(true);
+		    event.getMessage()
+		    .getChannel().block()
+		    .createMessage("music is paused, use command !resume to continue music").block();
+		    
+		});
+		
+		commands.put("resume", event -> {
+		    player.setPaused(false);
+		    event.getMessage()
+		    .getChannel().block()
+		    .createMessage("music is resumed").block();
+		    
+		});
+
+		// timer stuff
+		Timer timer = new Timer();
+		commands.put("timer", event -> timerFunc(timer, event));
+		
+		commands.put("musictimer", event -> {
+		    if (player.isPaused() == true) {
+		    	player.setPaused(false);
+		    }
+		    
+		    timerFunc(timer, event);
+		    
+		    
+
+		    
+		    
 		});
 
 		/* create and connect the client -- args[0] has Discord key */
