@@ -121,6 +121,12 @@ public class DStudy {
 
 	public static void main(String[] args) {
 		initSimpleCommands();
+		PomoTimer xd = new PomoTimer("SBBLR");
+		System.out.println(xd.toString());
+		xd.startPomo();
+		System.out.println(xd.toString());
+		if (true)
+			return;
 
 		/* begin complex audio commands -- we'll want to encapsulate these later probably */
 		// Utilizing LavaPlayer, creates AudioPlayer instances and translates URLs to AudioTrack instances
@@ -174,7 +180,7 @@ public class DStudy {
 
 		/* create and connect the client -- args[0] has Discord key */
 		final GatewayDiscordClient client = initClient(args[0]);
-		
+
 		client.onDisconnect().block();
 	}
 

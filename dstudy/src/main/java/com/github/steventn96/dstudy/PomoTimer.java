@@ -1,19 +1,29 @@
 package com.github.steventn96.dstudy;
 
 
-import javafx.util.Pair;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Queue;
-import java.util.Timer;
+import java.util.*;
 
 public class PomoTimer {
+    private class PomoTask {
+        public boolean isWork;
+        public int time;
+        PomoTask(boolean w, int t) {
+            isWork = w;
+            time = t;
+        }
+
+        @Override
+        public String toString() {
+            return time + " minute " + ((isWork) ? "work " : "rest ") + "cycle in progress";
+        }
+    }
     // would represent an instance of a timer
     private boolean hasStarted;
     private boolean expired;
     private Timer internalTimer;
-    private Queue<Pair<Integer, Integer>> taskQueue;
-    private static final Map<Character, Pair<Integer, Integer>> cycles = new HashMap<>();
+    private Queue<PomoTask> taskQueue;
+    private PomoTask currentCycle;
+    private static final Map<Character, PomoTask> cycles = new HashMap<>();
 
     /* we'll do the following
      * short work (25): S
@@ -30,23 +40,43 @@ public class PomoTimer {
         return true;
     }
 
+    /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
     PomoTimer(String cycle) {
         hasStarted = false;
         expired = false;
         internalTimer = new Timer();
-        cycles.put('S', new Pair<>(1, 25));
-        cycles.put('L', new Pair<>(1, 50));
-        cycles.put('B', new Pair<>(0, 5));
-        cycles.put('R', new Pair<>(0, 10));
+        currentCycle = null;
+        taskQueue = new LinkedList<>();
+        cycles.put('S', new PomoTask(true, 25));
+        cycles.put('L', new PomoTask(true, 50));
+        cycles.put('B', new PomoTask(false, 5));
+        cycles.put('R', new PomoTask(false, 10));
         if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
             throw new IllegalArgumentException("bad pomo format");
+    }
+
+    private void startNextPomo() {
+        currentCycle = taskQueue.poll();
+        System.out.println(currentCycle);
+        TimerTask pomotask = new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("Finished Task");
+                if (!taskQueue.isEmpty())
+                    startNextPomo();
+                else
+                    System.out.println("Finished Pomo");
+            }
+        };
+        internalTimer.schedule(pomotask, currentCycle.time * 1000);
     }
 
     // start the overall cycle (can only be called once?)
     public boolean startPomo() {
         if (hasStarted)
             return false;
-        //start
+        startNextPomo();
+        hasStarted = true;
         return true;
     }
 
@@ -70,17 +100,12 @@ public class PomoTimer {
         return true;
     }
 
-    private String get_cycle() {
-        return "Some Pomo Cycle";
-    }
-
     @Override
     public String toString() {
-        String toret = "";
-        while (!taskQueue.isEmpty()) {
-            Pair<Integer, Integer> next = taskQueue.poll();
-            toret += next.first + ", " + next.second + "/n";
-        }
-        return toret;
+        if (!hasStarted)
+            return "PomoTimer has not been started";
+        if (expired)
+            return "PomoTimer ended and expired, please discard reference";
+        return currentCycle.toString();
     }
 }
