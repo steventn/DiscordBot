@@ -1,6 +1,9 @@
 package com.github.steventn96.dstudy;
 
 
+import discord4j.core.object.entity.channel.MessageChannel;
+import reactor.core.publisher.Mono;
+
 import java.util.*;
 
 public class PomoTimer {
@@ -14,7 +17,7 @@ public class PomoTimer {
 
         @Override
         public String toString() {
-            return time + " minute " + ((isWork) ? "work " : "rest ") + "cycle in progress";
+            return time + " second " + ((isWork) ? "work " : "rest ") + "cycle in progress";
         }
     }
 
@@ -45,15 +48,21 @@ public class PomoTimer {
     private TimerTask currentTask; // seems a bit redundant to have two tasks; perhaps pomo task can wrap timer
 
     /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
-    PomoTimer(String cycle) {
+    private Mono<MessageChannel> chatchannel;
+
+    PomoTimer(String cycle, Mono<MessageChannel> channel) {
         hasStarted = false;
         expired = false;
         internalTimer = new Timer();
         currentCycle = null;
         taskQueue = new LinkedList<>();
-
+        chatchannel = channel;
         if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
             throw new IllegalArgumentException("bad pomo format");
+    }
+
+    private void sendMessage(String m) {
+        chatchannel.block().createMessage(m).block();
     }
 
     private boolean initializePomo(String cycle) {
@@ -76,15 +85,15 @@ public class PomoTimer {
 
     private void startNextPomo() {
         currentCycle = taskQueue.poll();
-        System.out.println(currentCycle);
+        sendMessage(currentCycle.toString());
         TimerTask pomotask = new TimerTask() {
             @Override
             public void run() {
-                System.out.println("Finished Task");
+                sendMessage("Finished Task");
                 if (!taskQueue.isEmpty())
                     startNextPomo();
                 else
-                    System.out.println("Finished Pomo");
+                    sendMessage("Finished Pomo");
             }
         };
         currentTask = pomotask;

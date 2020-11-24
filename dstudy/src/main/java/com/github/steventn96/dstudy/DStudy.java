@@ -25,6 +25,7 @@ public class DStudy {
 	
 	//data structure to hold all of our commands in one place
 	private static final Map<String, Command> commands = new HashMap<>();
+	private static PomoTimer currentTimer;
 
 	private static void timerFunc(Timer timer, MessageCreateEvent event, TimerTask task) {
 		//parse input
@@ -120,13 +121,8 @@ public class DStudy {
 	}
 
 	public static void main(String[] args) {
+		currentTimer = null;
 		initSimpleCommands();
-		PomoTimer xd = new PomoTimer("SBBLR");
-		System.out.println(xd.toString());
-		xd.startPomo();
-		System.out.println(xd.toString());
-		if (true)
-			return;
 
 		/* begin complex audio commands -- we'll want to encapsulate these later probably */
 		// Utilizing LavaPlayer, creates AudioPlayer instances and translates URLs to AudioTrack instances
@@ -176,6 +172,23 @@ public class DStudy {
 					player.setPaused(!player.isPaused());
 				}
 			});
+		});
+
+		// pomo test command
+		commands.put("pomo", event -> {
+			final String content = event.getMessage().getContent();
+			final List<String> command = Arrays.asList(content.split(" "));
+			try {
+				if (currentTimer != null && !currentTimer.hasEnded()) {
+					event.getMessage().getChannel().block().createMessage("Pomo Exists already").block();
+					return;
+				}
+				currentTimer = new PomoTimer(command.get(1), event.getMessage().getChannel());
+				currentTimer.startPomo();
+			}
+			catch (IllegalArgumentException e) {
+				event.getMessage().getChannel().block().createMessage("Error Creating Pomo Object");
+			}
 		});
 
 		/* create and connect the client -- args[0] has Discord key */
