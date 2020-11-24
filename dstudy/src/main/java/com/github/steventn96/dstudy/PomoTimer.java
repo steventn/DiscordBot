@@ -4,7 +4,7 @@ package com.github.steventn96.dstudy;
 import java.util.*;
 
 public class PomoTimer {
-    private class PomoTask {
+    private static class PomoTask {
         public boolean isWork;
         public int time;
         PomoTask(boolean w, int t) {
@@ -17,20 +17,45 @@ public class PomoTimer {
             return time + " minute " + ((isWork) ? "work " : "rest ") + "cycle in progress";
         }
     }
-    // would represent an instance of a timer
-    private boolean hasStarted;
-    private boolean expired;
-    private Timer internalTimer;
-    private Queue<PomoTask> taskQueue;
-    private PomoTask currentCycle;
-    private static final Map<Character, PomoTask> cycles = new HashMap<>();
 
-    /* we'll do the following
+    private static final Map<Character, PomoTask> cycles = new HashMap<>();
+    /* we'll do the following as defaults
      * short work (25): S
      * short break (5): B
      * long work (50): L
      * long break (10): R
      */
+    static {
+        cycles.put('S', new PomoTask(true, 25));
+        cycles.put('L', new PomoTask(true, 50));
+        cycles.put('B', new PomoTask(false, 5));
+        cycles.put('R', new PomoTask(false, 10));
+    }
+
+    // overall state
+    private boolean hasStarted; // do we need this?
+    private boolean expired; // and do we need this?
+
+    // scheduling
+    private Timer internalTimer;
+    private Queue<PomoTask> taskQueue;
+
+    // current execution state
+    private PomoTask currentCycle;
+    private TimerTask currentTask; // seems a bit redundant to have two tasks; perhaps pomo task can wrap timer
+
+    /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
+    PomoTimer(String cycle) {
+        hasStarted = false;
+        expired = false;
+        internalTimer = new Timer();
+        currentCycle = null;
+        taskQueue = new LinkedList<>();
+
+        if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
+            throw new IllegalArgumentException("bad pomo format");
+    }
+
     private boolean initializePomo(String cycle) {
         for (char c: cycle.toCharArray()) {
             if (!cycles.containsKey(c))
@@ -40,19 +65,13 @@ public class PomoTimer {
         return true;
     }
 
-    /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
-    PomoTimer(String cycle) {
-        hasStarted = false;
-        expired = false;
-        internalTimer = new Timer();
-        currentCycle = null;
-        taskQueue = new LinkedList<>();
-        cycles.put('S', new PomoTask(true, 25));
-        cycles.put('L', new PomoTask(true, 50));
-        cycles.put('B', new PomoTask(false, 5));
-        cycles.put('R', new PomoTask(false, 10));
-        if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
-            throw new IllegalArgumentException("bad pomo format");
+    // start the overall cycle (can only be called once?)
+    public boolean startPomo() {
+        if (hasStarted)
+            return false;
+        startNextPomo();
+        hasStarted = true;
+        return true;
     }
 
     private void startNextPomo() {
@@ -68,20 +87,15 @@ public class PomoTimer {
                     System.out.println("Finished Pomo");
             }
         };
+        currentTask = pomotask;
         internalTimer.schedule(pomotask, currentCycle.time * 1000);
-    }
-
-    // start the overall cycle (can only be called once?)
-    public boolean startPomo() {
-        if (hasStarted)
-            return false;
-        startNextPomo();
-        hasStarted = true;
-        return true;
     }
 
     // end session -- all references hopefully will be maintained properly
     public boolean endPomo() {
+        if (expired)
+            return true;
+        internalTimer.cancel();
         expired = true;
         return true;
     }
