@@ -174,7 +174,7 @@ public class DStudy {
 			});
 		});
 
-		// pomo test command
+		// pomo test commands
 		commands.put("pomo", event -> {
 			final String content = event.getMessage().getContent();
 			final List<String> command = Arrays.asList(content.split(" "));
@@ -190,6 +190,10 @@ public class DStudy {
 				event.getMessage().getChannel().block().createMessage("Error Creating Pomo Object");
 			}
 		});
+
+		commands.put("ppause", event -> currentTimer.pause());
+		commands.put("presume", event -> currentTimer.resume());
+		commands.put("pkill", event -> currentTimer.endPomo());
 
 		/* create and connect the client -- args[0] has Discord key */
 		final GatewayDiscordClient client = initClient(args[0]);
