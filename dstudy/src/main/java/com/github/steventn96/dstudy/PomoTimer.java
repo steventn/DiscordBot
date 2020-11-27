@@ -4,25 +4,25 @@ package com.github.steventn96.dstudy;
 import discord4j.core.object.entity.channel.MessageChannel;
 import reactor.core.publisher.Mono;
 
-import java.util.*;
+import java.util.*; // maybe make this less broad to reduce footprint (although we already have a bajillion things)
 
 public class PomoTimer {
     private static class PomoTask {
         public boolean isWork;
-        public int time;
+        public long time;
         private Date execTime;
+
         PomoTask(boolean w, int t) {
             isWork = w;
             time = t;
-            execTime = null; // do we need this?
         }
 
+        PomoTask(PomoTask copy) {
+            isWork = copy.isWork;
+            time = copy.time;
+        }
         public void setExecTime() {
             execTime = new Date(System.currentTimeMillis() + time);
-        }
-
-        public void setExecTime(long remainingMins) {
-            execTime = new Date(System.currentTimeMillis() + remainingMins);
         }
 
         public Date getExecTime() {
@@ -41,7 +41,6 @@ public class PomoTimer {
      * short break (5): B
      * long work (50): L
      * long break (10): R
-     * be careful with this map -- we are passing around the same 4 pomo objects, not a new one for each cycle
      */
     static {
         cycles.put('S', new PomoTask(true, 25 * 1000));
@@ -55,17 +54,16 @@ public class PomoTimer {
     private boolean expired; // and do we need this?
 
     // scheduling
-    private Timer internalTimer;
-    private Queue<PomoTask> taskQueue;
+    private final Timer internalTimer;
+    private final Queue<PomoTask> taskQueue;
 
     // current execution state
     private PomoTask currentCycle;
     private TimerTask currentTask; // seems a bit redundant to have two tasks; perhaps pomo task can wrap timer
     private boolean isPaused;
-    private long remainingTime;
 
     /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
-    private final Mono<MessageChannel> chatchannel;
+    private final Mono<MessageChannel> chatChannel;
 
     PomoTimer(String cycle, Mono<MessageChannel> channel) {
         hasStarted = false;
@@ -73,55 +71,51 @@ public class PomoTimer {
         internalTimer = new Timer();
         currentCycle = null;
         isPaused = false;
-        remainingTime = -1;
         taskQueue = new LinkedList<>();
-        chatchannel = channel;
+        chatChannel = channel;
         if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
             throw new IllegalArgumentException("bad pomo format");
-    }
-
-    private void sendMessage(String m) {
-        chatchannel.block().createMessage(m).block();
     }
 
     private boolean initializePomo(String cycle) {
         for (char c: cycle.toCharArray()) {
             if (!cycles.containsKey(c))
                 return false;
-            taskQueue.add(cycles.get(c));
+            taskQueue.add(new PomoTask(cycles.get(c)));
         }
         return true;
     }
 
-    // start the overall cycle (can only be called once?)
+    private void startNextPomo() {
+        if (!isPaused)
+            currentCycle = taskQueue.poll();
+        currentCycle.setExecTime();
+
+        sendMessage(currentCycle.toString());
+        TimerTask pomoTask = new TimerTask() {
+            @Override
+            public void run() {
+                sendMessage("Finished Task");
+                // play or pause music here
+                if (!taskQueue.isEmpty())
+                    startNextPomo();
+                else {
+                    expired = true;
+                    sendMessage("Finished Pomo");
+                }
+            }
+        };
+        currentTask = pomoTask;
+        internalTimer.schedule(pomoTask, currentCycle.getExecTime());
+    }
+
+    // start the overall cycle
     public boolean startPomo() {
         if (hasStarted)
             return false;
         startNextPomo();
         hasStarted = true;
         return true;
-    }
-
-    private void startNextPomo() {
-        if (!isPaused) {
-            currentCycle = taskQueue.poll();
-            currentCycle.setExecTime();
-        }
-        else
-            currentCycle.setExecTime(remainingTime);
-        sendMessage(currentCycle.toString());
-        TimerTask pomotask = new TimerTask() {
-            @Override
-            public void run() {
-                sendMessage("Finished Task");
-                if (!taskQueue.isEmpty())
-                    startNextPomo();
-                else
-                    sendMessage("Finished Pomo");
-            }
-        };
-        currentTask = pomotask;
-        internalTimer.schedule(pomotask, currentCycle.getExecTime());
     }
 
     // end session -- all references hopefully will be maintained properly
@@ -143,20 +137,28 @@ public class PomoTimer {
         if (isPaused || expired)
             return false;
         isPaused = true;
-        remainingTime = currentCycle.getExecTime().getTime() - System.currentTimeMillis();
+        currentCycle.time = currentCycle.getExecTime().getTime() - System.currentTimeMillis();
         currentTask.cancel();
-        sendMessage("cycle paused, !presume to resume");
+        sendMessage("cycle paused with " + currentCycle.time / 1000 + "s remaining, !presume to resume");
         return true;
     }
 
-    // resume the current timer, need to have not when to fire but how much remaining
+    // resume the current timer
     public boolean resume() {
         if (expired || !isPaused)
             return false;
         startNextPomo();
         isPaused = false;
-        remainingTime = -1;
         return true;
+    }
+
+    private void sendMessage(String m) {
+        try {
+            chatChannel.block().createMessage(m).block();
+        }
+        catch (NullPointerException e) {
+            System.out.println("problem sending message"); // use a logger here
+        }
     }
 
     @Override
