@@ -183,11 +183,17 @@ public class DStudy {
 					event.getMessage().getChannel().block().createMessage("Pomo Exists already").block();
 					return;
 				}
-				currentTimer = new PomoTimer(command.get(1), event.getMessage().getChannel());
+				if ("help".equals(command.get(1).toLowerCase())) {
+					event.getMessage().getChannel().block().createMessage("Pass a string " +
+							"for pomo timing: \n s - 25 min work \n l - 50 min work \n b - 5 min break \n" +
+							" r - 10 min break \n ex: \"sbs\" = 25 min work, 5 min break, 25 min work").block();
+					return;
+				}
+				currentTimer = new PomoTimer(command.get(1), event.getMessage().getChannel(), player);
 				currentTimer.startPomo();
 			}
 			catch (IllegalArgumentException e) {
-				event.getMessage().getChannel().block().createMessage("Error Creating Pomo Object");
+				event.getMessage().getChannel().block().createMessage("Error Creating Pomo Object").block();
 			}
 		});
 

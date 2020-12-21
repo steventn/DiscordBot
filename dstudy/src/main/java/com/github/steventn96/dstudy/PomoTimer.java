@@ -1,6 +1,7 @@
 package com.github.steventn96.dstudy;
 
 
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import discord4j.core.object.entity.channel.MessageChannel;
 import reactor.core.publisher.Mono;
 
@@ -43,10 +44,10 @@ public class PomoTimer {
      * long break (10): R
      */
     static {
-        cycles.put('S', new PomoTask(true, 25 * 1000));
-        cycles.put('L', new PomoTask(true, 50 * 1000));
-        cycles.put('B', new PomoTask(false, 5 * 1000));
-        cycles.put('R', new PomoTask(false, 10 * 1000));
+        cycles.put('s', new PomoTask(true, 25 * 1000));
+        cycles.put('l', new PomoTask(true, 50 * 1000));
+        cycles.put('b', new PomoTask(false, 5 * 1000));
+        cycles.put('r', new PomoTask(false, 10 * 1000));
     }
 
     // overall state
@@ -64,8 +65,9 @@ public class PomoTimer {
 
     /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
     private final Mono<MessageChannel> chatChannel;
+    private final AudioPlayer player;
 
-    PomoTimer(String cycle, Mono<MessageChannel> channel) {
+    PomoTimer(String cycle, Mono<MessageChannel> channel, AudioPlayer player) {
         hasStarted = false;
         expired = false;
         internalTimer = new Timer();
@@ -75,10 +77,11 @@ public class PomoTimer {
         chatChannel = channel;
         if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
             throw new IllegalArgumentException("bad pomo format");
+        this.player = player;
     }
 
     private boolean initializePomo(String cycle) {
-        for (char c: cycle.toCharArray()) {
+        for (char c: cycle.toLowerCase().toCharArray()) {
             if (!cycles.containsKey(c))
                 return false;
             taskQueue.add(new PomoTask(cycles.get(c)));
@@ -92,11 +95,15 @@ public class PomoTimer {
         currentCycle.setExecTime();
 
         sendMessage(currentCycle.toString());
+        if (player.getPlayingTrack() != null || player.isPaused()) {
+            player.setPaused(!currentCycle.isWork);
+        }
+        else
+            sendMessage("NOTE: No music playing or queued!");
         TimerTask pomoTask = new TimerTask() {
             @Override
             public void run() {
                 sendMessage("Finished Task");
-                // play or pause music here
                 if (!taskQueue.isEmpty())
                     startNextPomo();
                 else {
