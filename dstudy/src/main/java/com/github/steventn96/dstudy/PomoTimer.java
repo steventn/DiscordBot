@@ -12,6 +12,7 @@ public class PomoTimer {
         public boolean isWork;
         public long time;
         private Date execTime;
+        private TimerTask timerTask;
 
         PomoTask(boolean w, int t) {
             isWork = w;
@@ -29,6 +30,10 @@ public class PomoTimer {
         public Date getExecTime() {
             return execTime;
         }
+
+        public void setTimerTask(TimerTask tt) {timerTask = tt;}
+
+        public void cancelTimerTask() {timerTask.cancel();}
 
         @Override
         public String toString() {
@@ -60,10 +65,8 @@ public class PomoTimer {
 
     // current execution state
     private PomoTask currentCycle;
-    private TimerTask currentTask; // seems a bit redundant to have two tasks; perhaps pomo task can wrap timer
     private boolean isPaused;
 
-    /* Pomo timer should also take in a reference to the Audio Player to do playing and pausing of music */
     private final Mono<MessageChannel> chatChannel;
     private final AudioPlayer player;
 
@@ -112,7 +115,7 @@ public class PomoTimer {
                 }
             }
         };
-        currentTask = pomoTask;
+        currentCycle.setTimerTask(pomoTask);
         internalTimer.schedule(pomoTask, currentCycle.getExecTime());
     }
 
@@ -145,8 +148,9 @@ public class PomoTimer {
             return false;
         isPaused = true;
         currentCycle.time = currentCycle.getExecTime().getTime() - System.currentTimeMillis();
-        currentTask.cancel();
-        sendMessage("cycle paused with " + currentCycle.time / 1000 + "s remaining, !presume to resume");
+        currentCycle.cancelTimerTask();
+        sendMessage("Current " + (currentCycle.isWork ? "work" : "rest") + "cycle paused with " +
+                currentCycle.time / 1000 + "s remaining, !presume to resume");
         return true;
     }
 

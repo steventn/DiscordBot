@@ -12,6 +12,7 @@ import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.VoiceState;
+import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.discordjson.json.gateway.MessageCreate;
 import discord4j.voice.AudioProvider;
@@ -197,14 +198,22 @@ public class DStudy {
 			}
 		});
 
-		commands.put("ppause", event -> currentTimer.pause());
-		commands.put("presume", event -> currentTimer.resume());
-		commands.put("pkill", event -> currentTimer.endPomo());
+		commands.put("ppause", event -> {if (!pomo_exists(event)) return; currentTimer.pause();});
+		commands.put("presume", event -> {if (!pomo_exists(event)) return; currentTimer.resume();});
+		commands.put("pkill", event -> {if (!pomo_exists(event)) return; currentTimer.endPomo();});
 
 		/* create and connect the client -- args[0] has Discord key */
 		final GatewayDiscordClient client = initClient(args[0]);
 
 		client.onDisconnect().block();
+	}
+
+	private static boolean pomo_exists(MessageCreateEvent event) {
+		if (currentTimer == null || currentTimer.hasEnded()) {
+			event.getMessage().getChannel().block().createMessage("No current Pomo Object running.").block();
+			return false;
+		}
+		return true;
 	}
 
 }
