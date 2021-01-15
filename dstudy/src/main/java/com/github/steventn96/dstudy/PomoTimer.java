@@ -5,9 +5,11 @@ import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import discord4j.core.object.entity.channel.MessageChannel;
 import reactor.core.publisher.Mono;
 
-import java.util.*; // maybe make this less broad to reduce footprint (although we already have a bajillion things)
+import java.util.*;
+
 
 public class PomoTimer {
+    // this class needs a overhaul
     private static class PomoTask {
         public boolean isWork;
         public long time;
@@ -31,31 +33,37 @@ public class PomoTimer {
             return execTime;
         }
 
-        public void setTimerTask(TimerTask tt) {timerTask = tt;}
+        public void setTimerTask(TimerTask tt) {
+            timerTask = tt;
+        }
 
-        public void cancelTimerTask() {timerTask.cancel();}
+        public void cancelTimerTask() {
+            timerTask.cancel();
+        }
 
         @Override
         public String toString() {
-            return time / 1000 + " second " + ((isWork) ? "work " : "rest ") + "cycle in progress";
+            return ((execTime.getTime() - System.currentTimeMillis()) / (1000 * 60)) +
+                    ((isWork) ? " work " : " rest ") + "minutes remaining.";
         }
     }
 
-    private static final Map<Character, PomoTask> cycles = new HashMap<>();
     /* we'll do the following as defaults
      * short work (25): S
      * short break (5): B
      * long work (50): L
      * long break (10): R
      */
+    private static final Map<Character, PomoTask> cycles = new HashMap<>();
     static {
-        cycles.put('s', new PomoTask(true, 25 * 1000));
-        cycles.put('l', new PomoTask(true, 50 * 1000));
-        cycles.put('b', new PomoTask(false, 5 * 1000));
-        cycles.put('r', new PomoTask(false, 10 * 1000));
+        cycles.put('s', new PomoTask(true, 25 * 1000 * 60));
+        cycles.put('l', new PomoTask(true, 50 * 1000 * 60));
+        cycles.put('b', new PomoTask(false, 5 * 1000 * 60));
+        cycles.put('r', new PomoTask(false, 10 * 1000 * 60));
     }
 
     // overall state
+    private final String initString;
     private boolean hasStarted; // do we need this?
     private boolean expired; // and do we need this?
 
@@ -67,6 +75,7 @@ public class PomoTimer {
     private PomoTask currentCycle;
     private boolean isPaused;
 
+    // pointers
     private final Mono<MessageChannel> chatChannel;
     private final AudioPlayer player;
 
@@ -77,9 +86,10 @@ public class PomoTimer {
         currentCycle = null;
         isPaused = false;
         taskQueue = new LinkedList<>();
-        chatChannel = channel;
         if (!initializePomo(cycle)) // this should never happen if we have proper input parsing on the user side
             throw new IllegalArgumentException("bad pomo format");
+        initString = cycle;
+        chatChannel = channel;
         this.player = player;
     }
 
@@ -146,11 +156,11 @@ public class PomoTimer {
     public boolean pause() {
         if (isPaused || expired)
             return false;
+        currentCycle.cancelTimerTask();
         isPaused = true;
         currentCycle.time = currentCycle.getExecTime().getTime() - System.currentTimeMillis();
-        currentCycle.cancelTimerTask();
-        sendMessage("Current " + (currentCycle.isWork ? "work" : "rest") + "cycle paused with " +
-                currentCycle.time / 1000 + "s remaining, !presume to resume");
+        sendMessage("Current " + (currentCycle.isWork ? "work" : "rest") + " cycle paused with " +
+                currentCycle.time / (1000 * 60) + " min remaining, !presume to resume");
         return true;
     }
 
@@ -174,10 +184,17 @@ public class PomoTimer {
 
     @Override
     public String toString() {
+        // want to keep track of where we are in this *overall*
         if (!hasStarted)
             return "PomoTimer has not been started";
         if (expired)
             return "PomoTimer ended and expired, please discard reference";
-        return currentCycle.toString();
+        int n = initString.length();
+        int r = taskQueue.size();
+        String dispString = initString.substring(0,n-r-1) + '~' +
+                            initString.substring(n-r-1,n-r) + '~' +
+                            initString.substring(n-r);
+        return "Overall cycle: " + dispString + "\n" +
+                currentCycle.toString();
     }
 }

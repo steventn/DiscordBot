@@ -28,40 +28,6 @@ public class DStudy {
 	private static final Map<String, Command> commands = new HashMap<>();
 	private static PomoTimer currentTimer;
 
-	private static void timerFunc(Timer timer, MessageCreateEvent event, TimerTask task) {
-		//parse input
-		final String content = event.getMessage().getContent();
-		final List<String> command = Arrays.asList(content.split(" "));
-		int timerSeconds;
-		try {
-			timerSeconds = Integer.parseInt(command.get(1));
-		}
-		catch (NumberFormatException e) {
-			event.getMessage().getChannel().block()
-					.createMessage("argument [" + command.get(1) + "] not an integer").block();
-			return;
-		}
-		catch (Exception e) {
-			event.getMessage().getChannel().block()
-					.createMessage("something went wrong [!timer #SECS]").block();
-			return;
-		}
-
-		if (task == null)
-			task = new TimerTask() {
-				@Override
-				public void run() {
-					event.getMessage().getChannel().block()
-							.createMessage(timerSeconds + "s timer done!").block();
-				}
-			};
-
-		// execute task when timerSeconds * 1000 runs out
-		timer.schedule(task, timerSeconds * 1000);
-		event.getMessage().getChannel().block()
-				.createMessage(timerSeconds + "s timer started").block();
-	}
-
 	private static GatewayDiscordClient initClient(String token) {
 		final GatewayDiscordClient client = DiscordClientBuilder.create(token).build()
 				.login()
@@ -73,7 +39,9 @@ public class DStudy {
 		///with a prefix + command checking against, and if so, execute the command
 		client.getEventDispatcher().on(MessageCreateEvent.class)
 				.subscribe(event -> {
-					final String content = event.getMessage().getContent(); // 3.1 Message.getContent() is a String
+					final String content = event.getMessage().getContent().toLowerCase(); // 3.1 Message.getContent() is a String
+					if (!content.startsWith("!"))
+						return;
 					for (final Map.Entry<String, Command> entry : commands.entrySet()) {
 						if (content.startsWith('!' + entry.getKey())) {
 							entry.getValue().execute(event);
@@ -121,6 +89,34 @@ public class DStudy {
 		);
 	}
 
+	private static void initPomoCommands(AudioPlayer player) {
+		// maybe we can have one pomo per voice channel? hMMMMm
+		commands.put("pomo", event -> {
+			final String content = event.getMessage().getContent();
+			final List<String> command = Arrays.asList(content.split(" "));
+			try {
+				if (currentTimer != null && !currentTimer.hasEnded()) {
+					event.getMessage().getChannel().block().createMessage("Pomo Exists already").block();
+					return;
+				}
+				currentTimer = new PomoTimer(command.get(1), event.getMessage().getChannel(), player);
+				currentTimer.startPomo();
+			}
+			catch (IllegalArgumentException e) {
+				event.getMessage().getChannel().block().createMessage("Error Creating Pomo Object").block();
+			}
+		});
+
+		commands.put("phelp", event -> event.getMessage().getChannel().block().createMessage("Pass a string " +
+				"for pomo timing: \n s - 25 min work \n l - 50 min work \n b - 5 min break \n" +
+				" r - 10 min break \n ex: \"sbs\" = 25 min work, 5 min break, 25 min work").block());
+		commands.put("ppause", event -> {if (!pomo_exists(event)) return; currentTimer.pause();});
+		commands.put("presume", event -> {if (!pomo_exists(event)) return; currentTimer.resume();});
+		commands.put("pkill", event -> {if (!pomo_exists(event)) return; currentTimer.endPomo();});
+		commands.put("pinfo", event ->{if (!pomo_exists(event)) return;
+			event.getMessage().getChannel().block().createMessage(currentTimer.toString()).block();});
+	}
+
 	public static void main(String[] args) {
 		currentTimer = null;
 		initSimpleCommands();
@@ -139,6 +135,7 @@ public class DStudy {
 		final TrackScheduler scheduler = new TrackScheduler(player);
 
 		initPlayerCommands(playerManager, player, scheduler);
+		initPomoCommands(player);
 
 		//bot is able to join voice channel to play music
 		commands.put("join", event -> {
@@ -155,52 +152,6 @@ public class DStudy {
 				}
 			}
 		});
-
-		// timer stuff
-		// regular timer
-		Timer timer = new Timer();
-		commands.put("timer", event -> timerFunc(timer, event, null));
-		// pause or resume music after timer; just experimental
-		commands.put("toggletimer", event -> {
-			if (player.getPlayingTrack() == null) {
-				event.getMessage().getChannel().block()
-						.createMessage("no music paused, play with [!play]").block();
-				return;
-			}
-			timerFunc(timer, event, new TimerTask() {
-				@Override
-				public void run() {
-					player.setPaused(!player.isPaused());
-				}
-			});
-		});
-
-		// pomo test commands
-		commands.put("pomo", event -> {
-			final String content = event.getMessage().getContent();
-			final List<String> command = Arrays.asList(content.split(" "));
-			try {
-				if (currentTimer != null && !currentTimer.hasEnded()) {
-					event.getMessage().getChannel().block().createMessage("Pomo Exists already").block();
-					return;
-				}
-				if ("help".equals(command.get(1).toLowerCase())) {
-					event.getMessage().getChannel().block().createMessage("Pass a string " +
-							"for pomo timing: \n s - 25 min work \n l - 50 min work \n b - 5 min break \n" +
-							" r - 10 min break \n ex: \"sbs\" = 25 min work, 5 min break, 25 min work").block();
-					return;
-				}
-				currentTimer = new PomoTimer(command.get(1), event.getMessage().getChannel(), player);
-				currentTimer.startPomo();
-			}
-			catch (IllegalArgumentException e) {
-				event.getMessage().getChannel().block().createMessage("Error Creating Pomo Object").block();
-			}
-		});
-
-		commands.put("ppause", event -> {if (!pomo_exists(event)) return; currentTimer.pause();});
-		commands.put("presume", event -> {if (!pomo_exists(event)) return; currentTimer.resume();});
-		commands.put("pkill", event -> {if (!pomo_exists(event)) return; currentTimer.endPomo();});
 
 		/* create and connect the client -- args[0] has Discord key */
 		final GatewayDiscordClient client = initClient(args[0]);
