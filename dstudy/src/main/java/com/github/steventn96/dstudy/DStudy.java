@@ -26,6 +26,7 @@ public class DStudy {
 	
 	//data structure to hold all of our commands in one place
 	private static final Map<String, Command> commands = new HashMap<>();
+	private final Map<Long, >
 	private static PomoTimer currentTimer;
 
 	private static GatewayDiscordClient initClient(String token) {
@@ -55,19 +56,29 @@ public class DStudy {
 
 	private static void initSimpleCommands() {
 		// simple commands here
+		
 		commands.put("ping", event -> event.getMessage()
 				.getChannel().block()
-				.createMessage("Pong!").block());
+				.createMessage("pong").block());
 		commands.put("swag", event -> event.getMessage()
 				.getChannel().block()
 				.createMessage("Yeet!").block());
+		commands.put("help", event -> event.getMessage()
+				.getChannel().block()
+				.createMessage("Commands: \n !play LINK to play music \n !pause \n !resume "
+						+ "\n !stop \n !pomo to start timer \n !phelp to customize pomo timer").block());
 	}
 
 	private static void initPlayerCommands(AudioPlayerManager playerManager, AudioPlayer player, TrackScheduler scheduler) {
 		commands.put("play", event -> {
 			final String content = event.getMessage().getContent();
-			final List<String> command = Arrays.asList(content.split(" "));
+			final List<String> command = Arrays.asList(content.split(" ")); 
 			playerManager.loadItem(command.get(1), scheduler);
+			
+			
+			
+			event.getMessage().getChannel().block()
+			.createMessage("start pomo with !pomo").block();
 		});
 
 		commands.put("pause", event -> {
@@ -87,6 +98,10 @@ public class DStudy {
 		commands.put("stop", event ->
 			player.stopTrack()
 		);
+	}
+	
+	private static void trackQueueing(TrackScheduler scheduler) {
+		
 	}
 
 	private static void initPomoCommands(AudioPlayer player) {
@@ -109,7 +124,7 @@ public class DStudy {
 
 		commands.put("phelp", event -> event.getMessage().getChannel().block().createMessage("Pass a string " +
 				"for pomo timing: \n s - 25 min work \n l - 50 min work \n b - 5 min break \n" +
-				" r - 10 min break \n ex: \"sbs\" = 25 min work, 5 min break, 25 min work").block());
+				" r - 10 min break \n ex: !pomo sbs = 25 min work, 5 min break, 25 min work").block());
 		commands.put("ppause", event -> {if (!pomo_exists(event)) return; currentTimer.pause();});
 		commands.put("presume", event -> {if (!pomo_exists(event)) return; currentTimer.resume();});
 		commands.put("pkill", event -> {if (!pomo_exists(event)) return; currentTimer.endPomo();});
@@ -152,11 +167,12 @@ public class DStudy {
 				}
 			}
 		});
-
+				
 		/* create and connect the client -- args[0] has Discord key */
 		final GatewayDiscordClient client = initClient(args[0]);
 
 		client.onDisconnect().block();
+
 	}
 
 	private static boolean pomo_exists(MessageCreateEvent event) {
